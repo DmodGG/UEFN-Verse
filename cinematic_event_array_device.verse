@@ -25,18 +25,24 @@ cinematic_event_array_device := class(creative_device):
     # reflected after a restart. Set to false to only play cinematics live.
     @editable PlayMostRecentOnBoot : logic = true
 
+    # Playback rate for the boot "catch-up" play. Because some cinematic tracks
+    # only apply while actually playing, we fast-forward through the sequence
+    # instead of snapping to the end. High = near-instant. Set to 1.0 for normal.
+    @editable BootPlaybackRate : float = 50.0
+
     OnBegin<override>()<suspends> : void =
         Sleep(0.0) # Let the scene finish loading
 
         # How many cinematics are already "due" based on the real-world clock.
         DueCount := ComputeDueCount()
 
-        # 1. Optionally reflect current state by jumping the last due cinematic to
-        #    its final frame — the world ends up in the state that cinematic leaves
-        #    behind, without replaying the animation.
+        # 1. Optionally reflect current state by fast-forwarding the last due
+        #    cinematic to its end. Playing it at a high rate actually runs the
+        #    animation (so all tracks apply) but reaches the end near-instantly.
         if (PlayMostRecentOnBoot?, DueCount > 0, Seq := Sequences[DueCount - 1]):
-            Seq.GoToEndAndStop()
-            Print("Boot: sought cinematic #{DueCount - 1} to its end frame.")
+            Seq.SetPlayRate(BootPlaybackRate)
+            Seq.Play()
+            Print("Boot: fast-forwarding cinematic #{DueCount - 1} to its end.")
 
         # 2. Walk a boundary marker to the fire time of the NEXT cinematic.
         #    NextTime = StartEpochSeconds + NextIndex * DelayBetweenSeconds,
